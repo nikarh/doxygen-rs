@@ -7,7 +7,7 @@ use crate::parser::{parse, GrammarItem, ParseError};
 ///
 /// This function can error if there are missing parts of a given Doxygen annotation (like `@param`
 /// missing the variable name)
-pub fn rustdoc(input: String) -> Result<String, ParseError> {
+pub fn rustdoc(input: &str) -> Result<String, ParseError> {
     let parsed = parse(input)?;
     let mut result = String::new();
     let mut already_added_params = false;
@@ -44,7 +44,7 @@ pub fn rustdoc(input: String) -> Result<String, ParseError> {
             }
             GrammarItem::Text(v) => {
                 if group_started {
-                    v.replacen("*", "", 1)
+                    v.replacen('*', "", 1)
                 } else {
                     v
                 }
@@ -65,9 +65,9 @@ pub fn rustdoc(input: String) -> Result<String, ParseError> {
 }
 
 fn generate_notation(
-    tag: String,
-    meta: Vec<String>,
-    params: Vec<String>,
+    tag: &str,
+    meta: Vec<&str>,
+    params: Vec<&str>,
     (already_params, already_returns, already_throws): (bool, bool, bool),
 ) -> (String, (bool, bool, bool)) {
     let mut new_param = false;
@@ -75,9 +75,9 @@ fn generate_notation(
     let mut new_throw = false;
 
     (
-        match tag.as_str() {
+        match tag {
             "param" => {
-                let param = params.get(0);
+                let param = params.first();
                 new_param = true;
                 let mut str = if !already_params {
                     "# Arguments\n\n".into()
@@ -88,17 +88,15 @@ fn generate_notation(
                 str += &if let Some(param) = param {
                     if meta.is_empty() {
                         format!("* `{param}` -")
+                    } else if let Some(second) = meta.get(1) {
+                        format!(
+                            "* `{}` (direction {}, {}) -",
+                            param,
+                            meta.first().unwrap(),
+                            second
+                        )
                     } else {
-                        if let Some(second) = meta.get(1) {
-                            format!(
-                                "* `{}` (direction {}, {}) -",
-                                param,
-                                meta.get(0).unwrap(),
-                                second
-                            )
-                        } else {
-                            format!("* `{}` (direction {}) -", param, meta.get(0).unwrap())
-                        }
+                        format!("* `{}` (direction {}) -", param, meta.first().unwrap())
                     }
                 } else {
                     String::new()
@@ -108,33 +106,35 @@ fn generate_notation(
             }
             "a" | "e" | "em" => {
                 let word = params
-                    .get(0)
+                    .first()
                     .expect("@a/@e/@em doesn't contain a word to style");
                 format!("_{word}_")
             }
             "b" => {
-                let word = params.get(0).expect("@b doesn't contain a word to style");
+                let word = params.first().expect("@b doesn't contain a word to style");
                 format!("**{word}**")
             }
             "c" | "p" => {
                 let word = params
-                    .get(0)
+                    .first()
                     .expect("@c/@p doesn't contain a word to style");
                 format!("`{word}`")
             }
             "emoji" => {
-                let word = params.get(0).expect("@emoji doesn't contain an emoji");
+                let word = params.first().expect("@emoji doesn't contain an emoji");
                 emojis::EMOJIS
                     .get(&word.replace(':', ""))
                     .expect("invalid emoji")
                     .to_string()
             }
             "sa" | "see" => {
-                let code_ref = params.get(0).expect("@sa/@see doesn't contain a reference");
+                let code_ref = params
+                    .first()
+                    .expect("@sa/@see doesn't contain a reference");
                 format!("[`{code_ref}`]")
             }
             "retval" => {
-                let var = params.get(0).expect("@retval doesn't contain a parameter");
+                let var = params.first().expect("@retval doesn't contain a parameter");
                 new_return = true;
                 let mut str = if !already_returns {
                     "# Returns\n\n".into()
@@ -155,7 +155,7 @@ fn generate_notation(
             }
             "throw" | "throws" | "exception" => {
                 new_throw = true;
-                let exception = params.get(0).expect("@param doesn't contain a parameter");
+                let exception = params.first().expect("@param doesn't contain a parameter");
 
                 let mut str = if !already_throws {
                     "# Throws\n\n".into()
@@ -174,7 +174,7 @@ fn generate_notation(
             "details" | "pre" | "post" => String::from("\n\n"),
             "brief" | "short" => String::new(),
             "code" => {
-                let lang = params.first().map(|p| p.as_str()).unwrap_or_default();
+                let lang = params.first().cloned().unwrap_or_default();
                 let lang = lang.strip_prefix('.').unwrap_or(lang);
                 format!("```{lang}")
             }
@@ -191,7 +191,7 @@ mod test {
 
     macro_rules! test_rustdoc {
         ($input:literal, $expected:literal) => {
-            let result = $crate::generator::rustdoc($input.into()).unwrap();
+            let result = $crate::generator::rustdoc($input).unwrap();
             assert_eq!(result, $expected);
         };
     }
@@ -386,6 +386,6 @@ mod test {
     #[test]
     fn can_parse_example() {
         let example = include_str!("../tests/assets/example-bindgen.rs");
-        println!("{}", rustdoc(example.into()).unwrap());
+        println!("{}", rustdoc(example).unwrap());
     }
 }

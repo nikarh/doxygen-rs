@@ -39,5 +39,5 @@ mod parser;
 ///
 /// This function will panic if any error from [`generator::rustdoc`] is returned.
 pub fn transform(value: &str) -> String {
-    generator::rustdoc(value.into()).expect("failed to transform the comments")
+    generator::rustdoc(value).expect("failed to transform the comments")
 }
